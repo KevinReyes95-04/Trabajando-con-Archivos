@@ -1,0 +1,307 @@
+---
+title: "Taller 8 de Programación para SIG"
+author: "Kevin Orlando Reyes Mosquera"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    number-sections: true
+    theme: cosmo
+    code-fold: show
+    code-tools: true
+    code-copy: true
+    smooth-scroll: true
+    self-contained: true
+  pdf:
+    toc: true
+    number-sections: true
+    colorlinks: true
+execute:
+  echo: true
+  warning: false
+  message: false
+lang: es
+---
+
+<style>
+/* Fondo general y tipografía */
+body {
+  text-align: justify;
+  line-height: 1.7;
+}
+
+/* Títulos */
+h1, h2, h3 {
+  font-weight: 700;
+}
+
+h1 {
+  border-bottom: 3px solid #2c7fb8;
+  padding-bottom: 0.3rem;
+  margin-top: 1.2rem;
+}
+
+h2 {
+  color: #1f5f8b;
+  margin-top: 1.5rem;
+}
+
+h3 {
+  color: #2c7a7b;
+}
+
+/* Cajas personalizadas */
+.caja-suave {
+  background: #f7fbff;
+  border-left: 6px solid #2c7fb8;
+  padding: 1rem 1.2rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+.caja-verde {
+  background: #f3fbf6;
+  border-left: 6px solid #2ca25f;
+  padding: 1rem 1.2rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+.caja-morada {
+  background: #faf7ff;
+  border-left: 6px solid #7a4ebf;
+  padding: 1rem 1.2rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+/* Código */
+pre, code {
+  border-radius: 8px;
+}
+
+pre code {
+  font-size: 0.95rem;
+}
+
+/* Tablas */
+table {
+  width: 100%;
+  margin: 1rem 0;
+}
+
+th {
+  background-color: #eaf4fb !important;
+}
+
+/* Bloques destacados */
+blockquote {
+  border-left: 5px solid #2c7fb8;
+  background: #f8fbfd;
+  padding: 0.8rem 1rem;
+  border-radius: 6px;
+}
+</style>
+
+# Introducción
+
+En el mundo real de la geomática, no todos los datos espaciales llegan a nuestras manos en formatos geográficos perfectamente estructurados como Shapefiles (.shp) o GeoPackages (.gpkg). Con muchísima frecuencia, los analistas espaciales deben lidiar con datos “crudos”: coordenadas GPS capturadas en libretas de campo electrónicas y guardadas en archivos de texto plano, bases de datos socioeconómicas del DANE en formato CSV, o registros de estaciones meteorológicas del IDEAM que contienen valores nulos o errores de tipeo.
+
+::: {.callout-note title="Objetivos del taller" appearance="simple"}
+1. **Manipular archivos en el sistema operativo:** Abrir, leer y escribir archivos de texto plano y tabulares (CSV) garantizando el cierre seguro de las conexiones en Python, R y Julia.
+2. **Procesar y limpiar cadenas de texto:** Utilizar métodos nativos de manipulación de *strings* para separar, limpiar y extraer valores numéricos de coordenadas (latitud y longitud).
+3. **Implementar manejo robusto de excepciones:** Construir bloques de control predictivos (`try...except`, `tryCatch`) que capturen errores específicos (como archivos no encontrados o formatos de datos inválidos) sin interrumpir el flujo del programa.
+4. **Estructurar información asimétrica:** Transformar texto crudo en estructuras de memoria eficientes (como listas de diccionarios) que sirvan de puente hacia la construcción de *DataFrames* espaciales.
+:::
+
+::: {.callout-tip title="Idea central del capítulo" appearance="simple"}
+La meta de este taller no es solo que el código funcione, sino que quede bien organizado, sea reutilizable y se parezca más a la lógica de un problema real en SIG.
+:::
+
+# Ejercicio 1: Limpiando un inventario forestal (I/O y Excepciones)
+
+## Código desarrollado
+
+```{python}
+# 1. Definimos los datos usando un string de múltiples líneas
+arboles_crudos_txt = """Especie,Latitud,Longitud
+Roble,4.6097,-74.0817
+Pino,4.6XYZ,-74.0900
+Cedro,4.6150,-74.0850
+Eucalipto,NULA,-74.0700
+Nogal,4.6200,-74.0650"""
+
+# 2. Función que lee línea por línea, valida los datos y guarda
+#    únicamente los registros correctos en un archivo CSV
+def limpiar_inventario(arboles_crudos_txt):
+    """
+    Lee datos de un inventario forestal en formato de texto.
+    Retorna una lista de diccionarios con la información limpia.
+    Además, guarda las líneas válidas en un archivo llamado
+    'arboles_limpios.csv'.
+    """
+    arboles_limpios = []
+
+    # Dividimos el string en líneas
+    lineas = arboles_crudos_txt.splitlines()
+
+    # Abrimos el archivo de salida y escribimos el encabezado
+    with open("arboles_limpios.csv", "w", encoding="utf-8") as archivo_salida:
+        archivo_salida.write("Especie,Latitud,Longitud\n")
+
+        # Omitimos el encabezado
+        for num_linea, linea in enumerate(lineas[1:], start=2):
+            partes = linea.strip().split(",")
+
+            # Tomamos la especie desde el inicio para poder reportarla si hay error
+            especie_nombre = partes[0] if len(partes) > 0 else "Desconocida"
+
+            try:
+                if len(partes) != 3:
+                    raise ValueError("La línea no tiene exactamente 3 campos")
+
+                latitud = float(partes[1])
+                longitud = float(partes[2])
+
+                # Guardamos en la lista
+                arboles_limpios.append({
+                    "especie": especie_nombre,
+                    "latitud": latitud,
+                    "longitud": longitud
+                })
+
+                # Si la línea es válida, la escribimos en el archivo CSV
+                archivo_salida.write(f"{especie_nombre},{latitud},{longitud}\n")
+
+            except ValueError:
+                # Si falla, omitimos la línea y mostramos advertencia con la especie
+                print(f"Advertencia: La especie '{especie_nombre}' tiene un error y no fue procesada.")
+            else:
+                print(f"Línea {num_linea} procesada correctamente: {linea.strip()}")
+            finally:
+                print(f"Finalizando procesamiento de la línea {num_linea}.\n")
+
+    return arboles_limpios
+
+# 3. Llamamos la función
+resultado = limpiar_inventario(arboles_crudos_txt)
+
+# 4. Mostramos la lista final de registros limpios
+print("Inventario limpio:")
+print(resultado)
+```
+
+
+## Análisis del ejercicio
+
+::: {.callout-important title="Lectura del resultado" appearance="simple"}
+En este ejercicio construimos una función para limpiar un inventario forestal a partir de un texto con varias líneas. En palabras castizas, el programa revisa registro por registro, intenta convertir las coordenadas a valores numéricos flotantes y solo conserva aquellas especies o nombres de árboles cuya información es válida. Los registros correctos se guardan tanto en una lista de diccionarios como en un nuevo archivo llamado arboles_limpios.csv, mientras que los datos con errores se omiten y generan una advertencia en consola por si queremos revisarlos y corregirlos. 
+:::
+
+
+* **Sobre el Ejercicio 1 (Manejo de Excepciones):** Explica por qué procesar datos espaciales usando bloques `try...catch` (o `except`) es una mejor práctica que dejar que el intérprete arroje un error por defecto. ¿Qué pasaría con un archivo de 500,000 registros si el registro número 499,999 tiene un error tipográfico y no usaste manejo de excepciones?
+
+Respuesta
+
+::: {.callout-tip title="Respuesta" appearance="simple"}
+Usar bloques `try...except` para procesar datos espaciales es una mejor práctica porque permite manejar errores de manera controlada sin interrumpir el flujo del programa. Si un registro tiene un error tipográfico, el bloque `except` puede capturar ese error, mostrar una advertencia y continuar procesando los registros restantes.
+Esto es crucial cuando se trabaja con grandes volúmenes de datos, como un archivo de 500,000 registros. Si no usáramos manejo de excepciones, el programa arrojaría un error en el registro número 499,999 y se detendría, dejando sin procesar el último registro y cualquier otro que pudiera haber después. 
+En cambio, al usar manejo de excepciones, el programa puede seguir funcionando y procesar los demás registros, omitiendo únicamente aquel que presenta el error. Esto permite que la ejecución continúe hasta el final, incluso si falta un archivo o aparece un dato inválido, lo cual hace más eficiente el análisis de datos espaciales.
+
+:::
+
+# Ejercicio 2: Analizando datos estructurados (Diccionarios y Listas)
+
+## Código desarrollado
+
+```{python}
+#--------------------------------------------------
+# Ejercicio 2: Analizando datos estructurados (Diccionarios y Listas)
+#---------------------------------------------------
+
+import csv
+
+# 1. Crear una función que lea el archivo CSV generado en el ejercicio anterior
+#    y lo convierta en una lista de diccionarios.
+def leer_inventario_csv(nombre_archivo):
+    """
+    Lee un archivo CSV con el inventario de árboles y lo convierte
+    en una lista de diccionarios.
+    Cada diccionario representa un árbol con las claves:
+    'especie', 'latitud' y 'longitud'.
+    """
+    arboles = []
+
+    try:
+        with open(nombre_archivo, mode="r", encoding="utf-8") as archivo_csv:
+            lector_csv = csv.DictReader(archivo_csv)
+
+            for fila in lector_csv:
+                try:
+                    arbol = {
+                        "especie": fila["Especie"],
+                        "latitud": float(fila["Latitud"]),
+                        "longitud": float(fila["Longitud"])
+                    }
+                    arboles.append(arbol)
+
+                except ValueError as e:
+                    print(f"Error al convertir coordenadas para la especie '{fila['Especie']}': {e}")
+                except KeyError as e:
+                    print(f"Error: falta la columna {e} en el archivo CSV.")
+
+    except FileNotFoundError:
+        print(f"Error: no se encontró el archivo '{nombre_archivo}'.")
+
+    return arboles
+
+
+# 2. Almacenar todos esos diccionarios en una lista principal
+arboles_inventario = leer_inventario_csv("arboles_limpios.csv")
+print(f"Se cargaron {len(arboles_inventario)} árboles desde el archivo CSV.")
+
+# 3. Recorrer esa lista final y calcular la latitud promedio
+if arboles_inventario:
+    latitudes = [arbol["latitud"] for arbol in arboles_inventario]
+    latitud_promedio = sum(latitudes) / len(latitudes)
+    print(f"La latitud promedio de los árboles válidos es: {latitud_promedio:.4f}")
+else:
+    print("No se encontraron árboles válidos para calcular la latitud promedio.")
+```
+
+## Análisis del ejercicio
+
+::: {.callout-important title="Lectura del resultado" appearance="simple"}
+En este ejercicio trabajamos con datos estructurados usando listas y diccionarios, a partir de la lectura de un archivo CSV generado previamente en el ejercicio anterior. El programa convierte cada fila del archivo en un diccionario con la información de la especie del árbol y sus coordenadas, reúne todos esos registros en una lista principal y luego usa esos datos para calcular la latitud promedio de los árboles válidos. Además, incluye manejo de errores para evitar que la ejecución se detenga si falta el archivo o si alguna coordenada no puede convertirse correctamente.
+:::
+
+
+* **Sobre la Gestión de Recursos (I/O):** Compara cómo Python y Julia manejan el cierre automático de archivos (`with open(...) as f:` vs `open(...) do f`) frente al enfoque de R (`close()`). ¿Por qué es un riesgo de seguridad y rendimiento dejar conexiones de archivos abiertas en un flujo de geoprocesamiento continuo?
+
+Respuesta
+
+::: {.callout-note title="Respuesta" appearance="simple"}
+En Python y Julia este manejo es mucho más cómodo y seguro, porque ambos lenguajes tienen una forma de abrir archivos y cerrarlos automáticamente al terminar. En Python eso se hace con `with open(...) as f:`, y en Julia con `open(...) do f`. La ventaja es que, aunque ocurra un error en medio del proceso, el archivo igual se cierra sin que uno tenga que preocuparse por hacerlo manualmente.
+
+En R, en cambio, muchas veces toca estar más pendiente de eso. Si se abre una conexión y no se usa `close()`, esa conexión puede quedar abierta. Puede parecer un detalle pequeño, pero en un flujo de geoprocesamiento continuo sí puede volverse un problema serio, porque cada archivo abierto consume memoria y recursos del sistema. Si eso se repite muchas veces, el programa puede empezar a volverse más lento, fallar al intentar abrir nuevos archivos o incluso interrumpir el procesamiento.
+
+Además, dejar conexiones abiertas no solo afecta el rendimiento, sino también la seguridad y la estabilidad del proceso. Un archivo mal cerrado puede quedar bloqueado, generar errores en pasos posteriores o dejar datos a medio escribir. Por eso, en análisis espaciales donde se leen y escriben muchos archivos de forma constante, cerrar bien las conexiones no es un simple detalle técnico, sino una práctica clave para que todo funcione de manera limpia, segura y eficiente.
+:::
+
+* **Sobre la Limpieza de Datos:** Explica brevemente cuál es la función de los comandos `strip()` (o `trimws()`) y `split()` al momento de crear bases de datos a partir de archivos de texto plano. ¿Qué errores silenciosos evitan al momento de intentar convertir texto a números decimales?
+
+Respuesta
+
+::: {.callout-tip title="Respuesta" appearance="simple"}
+Los comandos `strip()` en Python (o `trimws()` en R) se utilizan para eliminar espacios en blanco al inicio y al final de una cadena de texto. Esto es importante porque a menudo los datos pueden venir con espacios adicionales que no son visibles pero que pueden causar problemas al intentar convertir el texto a números. Por ejemplo, si una coordenada viene como " 4.6097 ", el espacio extra puede hacer que la conversión a un número decimal falle o arroje un error.
+El comando `split()` se utiliza para dividir una cadena de texto en partes basándose en un separador, como una coma. Esto es fundamental cuando se trabaja con archivos de texto plano que contienen datos separados por comas (CSV), ya que permite extraer cada campo de información de manera estructurada. Sin `split()`, sería difícil separar la especie del árbol de sus coordenadas, lo que complicaría la creación de una base de datos organizada.
+En resumen, `strip()` ayuda a limpiar los datos de espacios no deseados que pueden causar errores silenciosos al convertir texto a números, mientras que `split()` facilita la estructuración de los datos al separar los campos correctamente. Ambos comandos son esenciales para garantizar que los datos se procesen de manera precisa y sin errores inesperados durante la conversión y análisis.
+:::
+
+# Conclusiones
+
+::: {.callout-important title="Cierre del taller" appearance="simple"}
+Este taller permitió explorar cómo manejar archivos de texto plano y CSV en Python, R y Julia, enfocándonos en la limpieza de datos espaciales y el manejo de excepciones para garantizar que el proceso sea robusto y eficiente. Aprendimos a transformar datos crudos en estructuras organizadas, lo que es fundamental para cualquier análisis espacial posterior. Además, se destacó la importancia de cerrar correctamente las conexiones de archivos para evitar problemas de rendimiento y seguridad en flujos de trabajo continuos.
+
+:::
