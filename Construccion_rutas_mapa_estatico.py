@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 # 1. Construcción segura de la ruta relativa
-ruta_archivo = Path("data/vector/geojson/COL.geo.json").resolve()
+ruta_archivo = Path("data/vector/geojson/COL.geo.geojson").resolve()
 
 try:
     # 2. Verificar si el archivo existe
